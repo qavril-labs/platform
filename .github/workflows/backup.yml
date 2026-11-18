@@ -3,9 +3,8 @@ name: Backup
 # OIDC role that can write only to platform/ in the backup bucket. Neon's own window is 6 hours.
 on:
   workflow_dispatch:
-  # schedule is enabled once qavril/prod/platform/backup-url exists in Secrets Manager:
-  # schedule:
-  #   - cron: "30 20 * * *"   # 02:00 IST
+  schedule:
+    - cron: "30 20 * * *"   # 02:00 IST every day
 permissions:
   id-token: write
   contents: read
