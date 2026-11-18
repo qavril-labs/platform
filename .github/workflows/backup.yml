@@ -12,7 +12,6 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-24.04
-    environment: production
     steps:
       - uses: actions/checkout@v4
       - name: Install PostgreSQL 18 client tools
