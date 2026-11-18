@@ -14,7 +14,8 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 file="/tmp/${SERVICE}-${stamp}.dump"
 
 # Custom format: compressed and restorable with pg_restore, selectively if needed.
-pg_dump --format=custom --no-owner --no-acl --file "$file" "$BACKUP_URL"
+# Only the product schema: the backup role has no rights on public.
+pg_dump --format=custom --no-owner --no-acl --schema=core --file "$file" "$BACKUP_URL"
 
 aws s3 cp "$file" "s3://${BACKUP_BUCKET}/${SERVICE}/${stamp}.dump" \
   --sse AES256 --only-show-errors
