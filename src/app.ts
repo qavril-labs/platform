@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { SERVICE_NAME } from "./config.js";
 import { DomainError } from "./errors.js";
@@ -10,6 +11,14 @@ export interface AppDeps {
   uow: UnitOfWork;
   sessions: SessionStore;
   now?: () => Date;
+  /** Shared secret for other services that resolve sessions. Unset means the internal route is off. */
+  internalToken?: string;
+}
+
+function sameSecret(given: string, expected: string): boolean {
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function bearer(req: FastifyRequest): string | null {
@@ -42,6 +51,24 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.get("/health", async () => ({ status: "ok", service: SERVICE_NAME }));
+
+  // Internal: other products resolve a session token here. Not under /v1, so it is not a public route.
+  app.post("/internal/sessions/resolve", async (req, reply) => {
+    const expected = deps.internalToken;
+    if (!expected) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "not found" } });
+    const given = req.headers["x-service-token"];
+    if (typeof given !== "string" || !sameSecret(given, expected)) {
+      return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "invalid service token" } });
+    }
+    const token = (req.body as { token?: unknown } | null)?.token;
+    const parsed = typeof token === "string" ? parseToken(token) : null;
+    if (typeof token !== "string" || !parsed) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "invalid session token" } });
+    const caller = await deps.sessions.resolve(hashToken(token), now());
+    if (!caller || caller.tenantId !== parsed.tenantId) {
+      return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "session not found or expired" } });
+    }
+    return { tenantId: caller.tenantId, actorId: caller.actorId, roles: caller.roles, permissions: caller.permissions };
+  });
 
   app.addHook("preHandler", async (req) => {
     if (!req.url.startsWith("/v1/")) return;

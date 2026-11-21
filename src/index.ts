@@ -11,5 +11,5 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const store = new MemoryPlatformStore();
-const app = buildApp({ uow: new MemoryUnitOfWork(store), sessions: new MemorySessionStore() });
+const app = buildApp({ uow: new MemoryUnitOfWork(store), sessions: new MemorySessionStore(), internalToken: process.env.INTERNAL_SERVICE_TOKEN });
 await app.listen({ port: PORT, host: "0.0.0.0" });
